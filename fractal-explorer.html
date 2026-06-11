@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fractal Explorer</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f0ede8;
+    color: #1a1a1a;
+    min-height: 100vh;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  h1 {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 18px;
+    align-self: flex-start;
+    margin-left: 2px;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid #e2ddd8;
+    border-radius: 12px;
+    overflow: hidden;
+    width: 820px;
+  }
+
+  .card + .card { margin-top: 14px; }
+
+  .card-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid #e2ddd8;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: #faf9f7;
+  }
+
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #888;
+    margin-right: 4px;
+  }
+
+  .tool-btn {
+    font-size: 12px;
+    padding: 4px 10px;
+    border: 1px solid #d5d0ca;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    color: #444;
+    font-family: inherit;
+    transition: background 0.1s, color 0.1s;
+  }
+  .tool-btn:hover { background: #f0ede8; }
+  .tool-btn.active {
+    background: #1a1a1a;
+    color: #fff;
+    border-color: #1a1a1a;
+  }
+
+  .clear-btn {
+    font-size: 12px;
+    padding: 4px 10px;
+    border: 1px solid #e2ddd8;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    color: #999;
+    font-family: inherit;
+  }
+  .clear-btn:hover { color: #555; border-color: #bbb; }
+
+  .overlay-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #666;
+    cursor: pointer;
+    user-select: none;
+    margin-left: 4px;
+  }
+  .overlay-label input { cursor: pointer; accent-color: #c85a1a; }
+
+  .hint-text {
+    font-size: 11px;
+    color: #bbb;
+    margin-left: auto;
+  }
+
+  /* Iteration bar */
+  .iter-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+  }
+  .iter-label {
+    font-size: 13px;
+    color: #666;
+    white-space: nowrap;
+    min-width: 70px;
+  }
+  .iter-bar input[type=range] {
+    flex: 1;
+    accent-color: #1a1a1a;
+    height: 4px;
+  }
+  .iter-val {
+    font-size: 14px;
+    font-weight: 600;
+    min-width: 22px;
+    text-align: right;
+    color: #1a1a1a;
+  }
+
+  /* Two-panel row */
+  .panels-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .panels-row .panel-col {
+    overflow: hidden;
+  }
+  .panels-row .panel-col + .panel-col {
+    border-left: 1px solid #e2ddd8;
+  }
+  .panels-row .card-header {
+    border-bottom: 1px solid #e2ddd8;
+  }
+
+  canvas { display: block; cursor: crosshair; }
+
+  /* Generate bar */
+  .gen-bar {
+    padding: 10px 16px;
+    border-bottom: 1px solid #e2ddd8;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #faf9f7;
+  }
+  .gen-btn {
+    padding: 6px 18px;
+    border: 1px solid #1a1a1a;
+    border-radius: 6px;
+    background: #1a1a1a;
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    transition: background 0.1s;
+  }
+  .gen-btn:hover { background: #333; }
+
+  #genHint {
+    font-size: 12px;
+    color: #aaa;
+    margin-left: auto;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body { background: #1c1a18; color: #e0e0e0; }
+    .card { background: #252320; border-color: #3a3632; }
+    .card-header { background: #1e1c1a; border-color: #3a3632; }
+    .card-title { color: #666; }
+    .tool-btn { background: #2e2b28; border-color: #3a3632; color: #ccc; }
+    .tool-btn:hover { background: #383430; }
+    .tool-btn.active { background: #e0e0e0; color: #1a1a1a; border-color: #e0e0e0; }
+    .clear-btn { color: #666; border-color: #3a3632; }
+    .clear-btn:hover { color: #aaa; border-color: #555; }
+    .overlay-label { color: #888; }
+    .iter-label { color: #888; }
+    .iter-val { color: #e0e0e0; }
+    .panels-row .panel-col + .panel-col { border-color: #3a3632; }
+    .gen-bar { background: #1e1c1a; border-color: #3a3632; }
+    .gen-btn { background: #e0e0e0; color: #1a1a1a; border-color: #e0e0e0; }
+    .gen-btn:hover { background: #ccc; }
+    #genHint { color: #555; }
+    .hint-text { color: #444; }
+    h1 { color: #555; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Fractal Explorer</h1>
+
+<!-- Iteration card -->
+<div class="card">
+  <div class="iter-bar">
+    <span class="iter-label">Iterations</span>
+    <input type="range" id="iterSlider" min="1" max="12" value="5" step="1">
+    <span class="iter-val" id="iterVal">5</span>
+  </div>
+</div>
+
+<!-- Drawing + transforms card -->
+<div class="card">
+  <div class="panels-row">
+    <div class="panel-col">
+      <div class="card-header">
+        <span class="card-title">Pattern</span>
+        <button class="tool-btn active" data-tool="line">Line</button>
+        <button class="tool-btn" data-tool="rect">Rect</button>
+        <button class="tool-btn" data-tool="ellipse">Ellipse</button>
+        <button class="tool-btn" data-tool="poly">Polygon</button>
+        <button class="clear-btn" id="clearDraw">Clear</button>
+      </div>
+      <canvas id="drawCanvas" width="400" height="400"></canvas>
+    </div>
+    <div class="panel-col">
+      <div class="card-header">
+        <span class="card-title">Transforms</span>
+        <label class="overlay-label">
+          <input type="checkbox" id="overlayCheck"> overlay original
+        </label>
+        <span class="hint-text">drag to add · click to select</span>
+        <button class="clear-btn" id="clearBoxes">Clear</button>
+      </div>
+      <canvas id="simCanvas" width="400" height="400"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Result card -->
+<div class="card">
+  <div class="gen-bar">
+    <button class="gen-btn" id="genBtn">Generate image</button>
+    <button class="clear-btn" id="clearResult">Clear</button>
+    <span id="genHint">Define a pattern &amp; transforms, then generate</span>
+  </div>
+  <canvas id="resultCanvas" width="820" height="460" style="width:100%;display:block"></canvas>
+</div>
+
+<script>
+const iterSlider = document.getElementById('iterSlider');
+const iterVal = document.getElementById('iterVal');
+iterSlider.addEventListener('input', () => iterVal.textContent = iterSlider.value);
+
+const DC = document.getElementById('drawCanvas');
+const dctx = DC.getContext('2d');
+const SC = document.getElementById('simCanvas');
+const sctx = SC.getContext('2d');
+const RC = document.getElementById('resultCanvas');
+const rctx = RC.getContext('2d');
+
+const darkMode = () => window.matchMedia('(prefers-color-scheme:dark)').matches;
+function strokeColor(){ return darkMode() ? '#e0e0e0' : '#1a1a1a'; }
+
+const OVERLAY_BOX = { x:0, y:0, w:SC.width, h:SC.height, overlay:true };
+
+let drawTool = 'line';
+document.querySelectorAll('.tool-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.tool-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    drawTool = b.dataset.tool;
+    polyPts = [];
+    redrawDraw();
+  });
+});
+
+let drawShapes = [], dStart = null, dCurrent = null, dDragging = false, polyPts = [];
+
+function renderShape(ctx, s, ox, oy, tw, th, srcSize, lw) {
+  const sx = tw / srcSize, sy = th / srcSize;
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.strokeStyle = strokeColor();
+  ctx.lineWidth = lw !== undefined ? lw : 1.5;
+  ctx.beginPath();
+  if (s.type === 'line') {
+    ctx.moveTo(s.x1*sx, s.y1*sy); ctx.lineTo(s.x2*sx, s.y2*sy); ctx.stroke();
+  } else if (s.type === 'rect') {
+    ctx.strokeRect(Math.min(s.x1,s.x2)*sx, Math.min(s.y1,s.y2)*sy, Math.abs(s.x2-s.x1)*sx, Math.abs(s.y2-s.y1)*sy);
+  } else if (s.type === 'ellipse') {
+    const cx=(s.x1+s.x2)/2*sx, cy=(s.y1+s.y2)/2*sy;
+    const erx=Math.abs(s.x2-s.x1)/2*sx, ery=Math.abs(s.y2-s.y1)/2*sy;
+    ctx.ellipse(cx, cy, erx||1, ery||1, 0, 0, Math.PI*2); ctx.stroke();
+  } else if (s.type === 'poly' && s.pts) {
+    ctx.moveTo(s.pts[0].x*sx, s.pts[0].y*sy);
+    s.pts.slice(1).forEach(p => ctx.lineTo(p.x*sx, p.y*sy));
+    ctx.closePath(); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function redrawDraw() {
+  dctx.clearRect(0, 0, DC.width, DC.height);
+  drawShapes.forEach(s => renderShape(dctx, s, 0, 0, DC.width, DC.height, DC.width, 1.5));
+  if (polyPts.length > 0) {
+    dctx.beginPath(); dctx.strokeStyle = strokeColor(); dctx.lineWidth = 1.5;
+    dctx.moveTo(polyPts[0].x, polyPts[0].y);
+    polyPts.slice(1).forEach(p => dctx.lineTo(p.x, p.y)); dctx.stroke();
+    polyPts.forEach(p => { dctx.beginPath(); dctx.arc(p.x,p.y,3,0,Math.PI*2); dctx.fillStyle=strokeColor(); dctx.fill(); });
+  }
+  if (dDragging && dStart && dCurrent && drawTool !== 'poly') {
+    dctx.strokeStyle = strokeColor()+'88'; dctx.lineWidth = 1;
+    renderShape(dctx, previewShape(), 0, 0, DC.width, DC.height, DC.width, 1);
+  }
+}
+
+function previewShape() {
+  let x1=dStart.x, y1=dStart.y, x2=dCurrent.x, y2=dCurrent.y;
+  if (dCurrent.ctrl) {
+    const dx=x2-x1, dy=y2-y1, s=Math.max(Math.abs(dx),Math.abs(dy));
+    if (drawTool==='rect'||drawTool==='ellipse') { x2=x1+(dx<0?-s:s); y2=y1+(dy<0?-s:s); }
+  }
+  return {type:drawTool, x1, y1, x2, y2};
+}
+
+DC.addEventListener('mousedown', e => {
+  const r=DC.getBoundingClientRect(), p={x:e.clientX-r.left, y:e.clientY-r.top};
+  if (drawTool==='poly') {
+    if (polyPts.length>2 && Math.hypot(p.x-polyPts[0].x, p.y-polyPts[0].y)<10) {
+      drawShapes.push({type:'poly', pts:[...polyPts]}); polyPts=[];
+    } else { polyPts.push(p); }
+    redrawDraw(); return;
+  }
+  dStart={...p}; dDragging=true;
+});
+DC.addEventListener('mousemove', e => {
+  if (!dDragging) return;
+  const r=DC.getBoundingClientRect();
+  dCurrent={x:e.clientX-r.left, y:e.clientY-r.top, ctrl:e.ctrlKey||e.metaKey};
+  redrawDraw();
+});
+DC.addEventListener('mouseup', e => {
+  if (!dDragging) return;
+  dDragging=false;
+  const r=DC.getBoundingClientRect();
+  dCurrent={x:e.clientX-r.left, y:e.clientY-r.top, ctrl:e.ctrlKey||e.metaKey};
+  const s=previewShape();
+  if (Math.hypot(s.x2-s.x1, s.y2-s.y1)>3) drawShapes.push(s);
+  dStart=null; dCurrent=null;
+  redrawDraw(); redrawSim();
+});
+document.getElementById('clearDraw').addEventListener('click', () => { drawShapes=[]; polyPts=[]; redrawDraw(); redrawSim(); });
+
+// --- Similarity panel ---
+let simBoxes=[], selBox=null, simMode=null, simStart=null, resizeHandle=null;
+const HANDLE=8;
+const overlayCheck=document.getElementById('overlayCheck');
+overlayCheck.addEventListener('change', () => redrawSim());
+
+function effectiveBoxes() {
+  return overlayCheck.checked ? [OVERLAY_BOX, ...simBoxes] : simBoxes;
+}
+
+function hitTest(bx, x, y) {
+  for (const [hx,hy,hname] of getHandles(bx)) {
+    if (Math.abs(x-hx)<HANDLE && Math.abs(y-hy)<HANDLE) return hname;
+  }
+  if (x>=bx.x && x<=bx.x+bx.w && y>=bx.y && y<=bx.y+bx.h) return 'move';
+  return null;
+}
+function getHandles(bx) {
+  return [
+    [bx.x,bx.y,'nw'],[bx.x+bx.w/2,bx.y,'n'],[bx.x+bx.w,bx.y,'ne'],
+    [bx.x,bx.y+bx.h/2,'w'],[bx.x+bx.w,bx.y+bx.h/2,'e'],
+    [bx.x,bx.y+bx.h,'sw'],[bx.x+bx.w/2,bx.y+bx.h,'s'],[bx.x+bx.w,bx.y+bx.h,'se']
+  ];
+}
+
+function drawBoxInSim(bx, index, isSel, isOverlay) {
+  if (drawShapes.length > 0) {
+    sctx.save();
+    sctx.beginPath(); sctx.rect(bx.x, bx.y, bx.w, bx.h); sctx.clip();
+    sctx.globalAlpha = darkMode() ? 0.55 : 0.45;
+    drawShapes.forEach(s => renderShape(sctx, s, bx.x, bx.y, bx.w, bx.h, DC.width, 1));
+    sctx.restore();
+  }
+  if (isOverlay) {
+    sctx.save();
+    sctx.strokeStyle = isSel ? '#c85a1a' : '#c85a1a99';
+    sctx.lineWidth = isSel ? 1.5 : 1;
+    sctx.setLineDash([5,3]);
+    sctx.strokeRect(bx.x+0.5, bx.y+0.5, bx.w-1, bx.h-1);
+    sctx.setLineDash([]);
+    sctx.fillStyle = '#c85a1a';
+    sctx.font = '11px -apple-system, sans-serif';
+    sctx.fillText('overlay', bx.x+5, bx.y+14);
+    sctx.restore();
+  } else {
+    sctx.fillStyle = isSel ? 'rgba(26,26,26,0.08)' : 'rgba(26,26,26,0.04)';
+    sctx.fillRect(bx.x, bx.y, bx.w, bx.h);
+    sctx.strokeStyle = isSel ? '#1a1a1a' : '#1a1a1a88';
+    sctx.lineWidth = isSel ? 1.5 : 1;
+    sctx.strokeRect(bx.x, bx.y, bx.w, bx.h);
+    sctx.fillStyle = '#1a1a1a';
+    sctx.font = '11px -apple-system, sans-serif';
+    sctx.fillText(index+1, bx.x+5, bx.y+14);
+    if (isSel) {
+      getHandles(bx).forEach(([hx,hy]) => {
+        sctx.fillStyle='#fff'; sctx.strokeStyle='#1a1a1a'; sctx.lineWidth=1.5;
+        sctx.beginPath(); sctx.rect(hx-4,hy-4,8,8); sctx.fill(); sctx.stroke();
+      });
+    }
+  }
+}
+
+function redrawSim() {
+  sctx.clearRect(0, 0, SC.width, SC.height);
+  if (drawShapes.length > 0) {
+    sctx.save();
+    sctx.globalAlpha = darkMode() ? 0.15 : 0.10;
+    drawShapes.forEach(s => renderShape(sctx, s, 0, 0, SC.width, SC.height, DC.width, 1));
+    sctx.restore();
+  }
+  if (overlayCheck.checked) drawBoxInSim(OVERLAY_BOX, -1, selBox===OVERLAY_BOX, true);
+  simBoxes.forEach((bx,i) => drawBoxInSim(bx, i, selBox===bx, false));
+  if (simMode==='new' && simStart) {
+    const {x1,y1,x2,y2}=simStart;
+    sctx.strokeStyle='#1a1a1a66'; sctx.lineWidth=1; sctx.setLineDash([4,3]);
+    sctx.strokeRect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1));
+    sctx.setLineDash([]);
+  }
+}
+
+SC.addEventListener('mousedown', e => {
+  const r=SC.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  let hit=null, hitBx=null;
+  for (let i=simBoxes.length-1; i>=0; i--) {
+    const h=hitTest(simBoxes[i], mx, my);
+    if (h) { hit=h; hitBx=simBoxes[i]; break; }
+  }
+  if (!hitBx && overlayCheck.checked) {
+    const h=hitTest(OVERLAY_BOX, mx, my);
+    if (h) { hit=h; hitBx=OVERLAY_BOX; }
+  }
+  if (hitBx) {
+    selBox=hitBx;
+    if (hitBx===OVERLAY_BOX) { simMode=null; redrawSim(); return; }
+    if (hit==='move') { simMode='move'; simStart={mx,my,ox:hitBx.x,oy:hitBx.y}; }
+    else { simMode='resize'; resizeHandle=hit; simStart={mx,my,ox:hitBx.x,oy:hitBx.y,ow:hitBx.w,oh:hitBx.h}; }
+  } else {
+    selBox=null; simMode='new'; simStart={x1:mx,y1:my,x2:mx,y2:my};
+  }
+  redrawSim();
+});
+SC.addEventListener('mousemove', e => {
+  const r=SC.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  if (simMode==='new' && simStart) { simStart.x2=mx; simStart.y2=my; redrawSim(); }
+  else if (simMode==='move' && selBox && simStart) {
+    selBox.x=simStart.ox+(mx-simStart.mx);
+    selBox.y=simStart.oy+(my-simStart.my);
+    redrawSim();
+  } else if (simMode==='resize' && selBox && simStart) {
+    const dx=mx-simStart.mx, dy=my-simStart.my, h=resizeHandle;
+    if (h.includes('e')) selBox.w=Math.max(10,simStart.ow+dx);
+    if (h.includes('s')) selBox.h=Math.max(10,simStart.oh+dy);
+    if (h.includes('w')) { selBox.x=simStart.ox+dx; selBox.w=Math.max(10,simStart.ow-dx); }
+    if (h.includes('n')) { selBox.y=simStart.oy+dy; selBox.h=Math.max(10,simStart.oh-dy); }
+    redrawSim();
+  } else {
+    let cursor='crosshair';
+    for (let i=simBoxes.length-1; i>=0; i--) {
+      const h=hitTest(simBoxes[i], mx, my);
+      if (h) {
+        cursor = h==='move'?'grab':h==='nw'||h==='se'?'nwse-resize':h==='ne'||h==='sw'?'nesw-resize':h==='n'||h==='s'?'ns-resize':'ew-resize';
+        break;
+      }
+    }
+    SC.style.cursor=cursor;
+  }
+});
+SC.addEventListener('mouseup', e => {
+  const r=SC.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  if (simMode==='new' && simStart) {
+    const bx={x:Math.min(simStart.x1,mx),y:Math.min(simStart.y1,my),w:Math.abs(mx-simStart.x1),h:Math.abs(my-simStart.y1)};
+    if (bx.w>8 && bx.h>8) { simBoxes.push(bx); selBox=bx; }
+  }
+  simMode=null; simStart=null; resizeHandle=null;
+  redrawSim();
+});
+document.getElementById('clearBoxes').addEventListener('click', () => { simBoxes=[]; selBox=null; simMode=null; redrawSim(); });
+
+// --- Fractal generation ---
+function drawFractalRecursive(ctx, shapes, srcSize, transforms, depth, ox, oy, tw, th) {
+  if (depth===0) {
+    shapes.forEach(s => renderShape(ctx, s, ox, oy, tw, th, srcSize, 1.5));
+    return;
+  }
+  transforms.forEach(bx => {
+    const nx=ox+(bx.x/SC.width)*tw;
+    const ny=oy+(bx.y/SC.height)*th;
+    const nw=(bx.w/SC.width)*tw;
+    const nh=(bx.h/SC.height)*th;
+    drawFractalRecursive(ctx, shapes, srcSize, transforms, depth-1, nx, ny, nw, nh);
+  });
+}
+
+document.getElementById('genBtn').addEventListener('click', () => {
+  const hint=document.getElementById('genHint');
+  const boxes=effectiveBoxes();
+  if (drawShapes.length===0 && polyPts.length===0) { hint.textContent='Draw something in the pattern window first'; return; }
+  if (boxes.length===0) { hint.textContent='Add at least one transform box'; return; }
+  const iters=parseInt(iterSlider.value);
+  const totalLeaves=Math.pow(boxes.length, iters);
+  if (totalLeaves>200000) {
+    hint.textContent=`Too complex (${boxes.length}^${iters} = ${totalLeaves.toLocaleString()} leaves). Reduce iterations or boxes.`;
+    return;
+  }
+  hint.textContent='Generating…';
+  setTimeout(() => {
+    const W=RC.width, H=RC.height;
+    rctx.clearRect(0,0,W,H);
+    const pad=30, avail=Math.min(W,H)-pad*2;
+    const startX=(W-avail)/2, startY=(H-avail)/2;
+    drawFractalRecursive(rctx, drawShapes, DC.width, boxes, iters-1, startX, startY, avail, avail);
+    hint.textContent=`${iters} iteration${iters>1?'s':''} · ${boxes.length} transform${boxes.length>1?'s':''}${overlayCheck.checked?' · overlay on':''}`;
+  }, 10);
+});
+
+document.getElementById('clearResult').addEventListener('click', () => {
+  rctx.clearRect(0,0,RC.width,RC.height);
+  document.getElementById('genHint').textContent='Define a pattern & transforms, then generate';
+});
+
+redrawDraw();
+redrawSim();
+</script>
+</body>
+</html>
