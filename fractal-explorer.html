@@ -225,6 +225,7 @@
         <button class="tool-btn" data-tool="rect">Rect</button>
         <button class="tool-btn" data-tool="ellipse">Ellipse</button>
         <button class="tool-btn" data-tool="poly">Polygon</button>
+        <button class="clear-btn" id="copyDraw">Copy</button>
         <button class="clear-btn" id="clearDraw">Clear</button>
       </div>
       <canvas id="drawCanvas" width="400" height="400"></canvas>
@@ -235,7 +236,8 @@
         <label class="overlay-label">
           <input type="checkbox" id="overlayCheck"> overlay original
         </label>
-        <span class="hint-text">drag to add · click to select</span>
+        <span class="hint-text">drag to add · click to select · ctrl = square</span>
+        <button class="clear-btn" id="copyBox">Copy</button>
         <button class="clear-btn" id="clearBoxes">Clear</button>
       </div>
       <canvas id="simCanvas" width="400" height="400"></canvas>
@@ -277,11 +279,13 @@ document.querySelectorAll('.tool-btn').forEach(b => {
     b.classList.add('active');
     drawTool = b.dataset.tool;
     polyPts = [];
+    selShape = null;
     redrawDraw();
   });
 });
 
 let drawShapes = [], dStart = null, dCurrent = null, dDragging = false, polyPts = [];
+let selShape = null; // selected shape in draw panel
 
 function renderShape(ctx, s, ox, oy, tw, th, srcSize, lw) {
   const sx = tw / srcSize, sy = th / srcSize;
@@ -308,7 +312,16 @@ function renderShape(ctx, s, ox, oy, tw, th, srcSize, lw) {
 
 function redrawDraw() {
   dctx.clearRect(0, 0, DC.width, DC.height);
-  drawShapes.forEach(s => renderShape(dctx, s, 0, 0, DC.width, DC.height, DC.width, 1.5));
+  drawShapes.forEach(s => {
+    if (s === selShape) {
+      dctx.save();
+      dctx.strokeStyle = '#c85a1a';
+      renderShape(dctx, s, 0, 0, DC.width, DC.height, DC.width, 2);
+      dctx.restore();
+    } else {
+      renderShape(dctx, s, 0, 0, DC.width, DC.height, DC.width, 1.5);
+    }
+  });
   if (polyPts.length > 0) {
     dctx.beginPath(); dctx.strokeStyle = strokeColor(); dctx.lineWidth = 1.5;
     dctx.moveTo(polyPts[0].x, polyPts[0].y);
@@ -352,11 +365,26 @@ DC.addEventListener('mouseup', e => {
   const r=DC.getBoundingClientRect();
   dCurrent={x:e.clientX-r.left, y:e.clientY-r.top, ctrl:e.ctrlKey||e.metaKey};
   const s=previewShape();
-  if (Math.hypot(s.x2-s.x1, s.y2-s.y1)>3) drawShapes.push(s);
+  if (Math.hypot(s.x2-s.x1, s.y2-s.y1)>3) { drawShapes.push(s); selShape=s; }
   dStart=null; dCurrent=null;
   redrawDraw(); redrawSim();
 });
-document.getElementById('clearDraw').addEventListener('click', () => { drawShapes=[]; polyPts=[]; redrawDraw(); redrawSim(); });
+document.getElementById('clearDraw').addEventListener('click', () => { drawShapes=[]; polyPts=[]; selShape=null; redrawDraw(); redrawSim(); });
+
+document.getElementById('copyDraw').addEventListener('click', () => {
+  const s = selShape || (drawShapes.length ? drawShapes[drawShapes.length-1] : null);
+  if (!s) return;
+  const OFF = 12;
+  let copy;
+  if (s.type === 'poly') {
+    copy = { type:'poly', pts: s.pts.map(p => ({x:p.x+OFF, y:p.y+OFF})) };
+  } else {
+    copy = { ...s, x1:s.x1+OFF, y1:s.y1+OFF, x2:s.x2+OFF, y2:s.y2+OFF };
+  }
+  drawShapes.push(copy);
+  selShape = copy;
+  redrawDraw(); redrawSim();
+});
 
 // --- Similarity panel ---
 let simBoxes=[], selBox=null, simMode=null, simStart=null, resizeHandle=null;
@@ -431,7 +459,11 @@ function redrawSim() {
   if (overlayCheck.checked) drawBoxInSim(OVERLAY_BOX, -1, selBox===OVERLAY_BOX, true);
   simBoxes.forEach((bx,i) => drawBoxInSim(bx, i, selBox===bx, false));
   if (simMode==='new' && simStart) {
-    const {x1,y1,x2,y2}=simStart;
+    let x1=simStart.x1, y1=simStart.y1, x2=simStart.x2||x1, y2=simStart.y2||y1;
+    if (simStart.ctrl) {
+      const dx=x2-x1, dy=y2-y1, s=Math.max(Math.abs(dx),Math.abs(dy));
+      x2=x1+(dx<0?-s:s); y2=y1+(dy<0?-s:s);
+    }
     sctx.strokeStyle='#1a1a1a66'; sctx.lineWidth=1; sctx.setLineDash([4,3]);
     sctx.strokeRect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1));
     sctx.setLineDash([]);
@@ -463,7 +495,10 @@ SC.addEventListener('mousedown', e => {
 SC.addEventListener('mousemove', e => {
   const r=SC.getBoundingClientRect();
   const mx=e.clientX-r.left, my=e.clientY-r.top;
-  if (simMode==='new' && simStart) { simStart.x2=mx; simStart.y2=my; redrawSim(); }
+  if (simMode==='new' && simStart) {
+    simStart.x2=mx; simStart.y2=my; simStart.ctrl=e.ctrlKey||e.metaKey;
+    redrawSim();
+  }
   else if (simMode==='move' && selBox && simStart) {
     selBox.x=simStart.ox+(mx-simStart.mx);
     selBox.y=simStart.oy+(my-simStart.my);
@@ -491,13 +526,28 @@ SC.addEventListener('mouseup', e => {
   const r=SC.getBoundingClientRect();
   const mx=e.clientX-r.left, my=e.clientY-r.top;
   if (simMode==='new' && simStart) {
-    const bx={x:Math.min(simStart.x1,mx),y:Math.min(simStart.y1,my),w:Math.abs(mx-simStart.x1),h:Math.abs(my-simStart.y1)};
+    let x1=simStart.x1, y1=simStart.y1, x2=mx, y2=my;
+    if (simStart.ctrl) {
+      const dx=x2-x1, dy=y2-y1, s=Math.max(Math.abs(dx),Math.abs(dy));
+      x2=x1+(dx<0?-s:s); y2=y1+(dy<0?-s:s);
+    }
+    const bx={x:Math.min(x1,x2),y:Math.min(y1,y2),w:Math.abs(x2-x1),h:Math.abs(y2-y1)};
     if (bx.w>8 && bx.h>8) { simBoxes.push(bx); selBox=bx; }
   }
   simMode=null; simStart=null; resizeHandle=null;
   redrawSim();
 });
 document.getElementById('clearBoxes').addEventListener('click', () => { simBoxes=[]; selBox=null; simMode=null; redrawSim(); });
+
+document.getElementById('copyBox').addEventListener('click', () => {
+  const src = selBox && selBox !== OVERLAY_BOX ? selBox : (simBoxes.length ? simBoxes[simBoxes.length-1] : null);
+  if (!src) return;
+  const OFF = 12;
+  const copy = { x:src.x+OFF, y:src.y+OFF, w:src.w, h:src.h };
+  simBoxes.push(copy);
+  selBox = copy;
+  redrawSim();
+});
 
 // --- Fractal generation ---
 function drawFractalRecursive(ctx, shapes, srcSize, transforms, depth, ox, oy, tw, th) {
