@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self-Similar Fractal Explorer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel2: #1c2130;
+    --border: #30363d;
+    --border-active: #3d8ef0;
+    --cyan: #3d8ef0;
+    --cyan-dim: #1e4a8a;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --canvas-bg: #0a0e14;
+    --grid: rgba(48,54,61,0.6);
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d29922;
+    --select: rgba(61,142,240,0.25);
+    --btn: #21262d;
+    --btn-hover: #30363d;
+    --radius: 12px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+    padding: 16px;
+    user-select: none;
+  }
+
+  h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .subtitle { color: var(--text-dim); font-size: 12px; margin-bottom: 14px; }
+
+  /* ── ITERATION SLIDER ── */
+  .iter-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 20px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .iter-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+  input[type=range] {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    cursor: pointer;
+  }
+  .iter-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent);
+    width: 32px;
+    text-align: center;
+  }
+
+  /* ── MAIN ROW ── */
+  .main-row {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 14px;
+    align-items: flex-start;
+  }
+
+  /* ── PANELS ── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    flex: 1;
+    min-width: 0;
+  }
+  .panel-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-title::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--cyan);
+  }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .tool-btn {
+    background: var(--btn);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: 7px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .tool-btn:hover { background: var(--btn-hover); color: var(--text); border-color: var(--border-active); }
+  .tool-btn.active { background: var(--cyan-dim); color: var(--accent); border-color: var(--cyan); }
+  .tool-btn.danger { color: var(--red); }
+  .tool-btn.danger:hover { background: rgba(248,81,73,0.15); border-color: var(--red); }
+  .tool-btn.success { color: var(--green); }
+  .tool-btn.success:hover { background: rgba(63,185,80,0.15); border-color: var(--green); }
+  .sep { width: 1px; height: 24px; background: var(--border); margin: 0 3px; }
+
+  /* ── CANVASES ── */
+  canvas {
+    display: block;
+    background: var(--canvas-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: crosshair;
+  }
+  canvas.select-mode { cursor: default; }
+
+  /* ── CHECKBOX ROW ── */
+  .check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .check-row input[type=checkbox] {
+    accent-color: var(--accent);
+    width: 14px; height: 14px;
+    cursor: pointer;
+  }
+  .check-row label { cursor: pointer; }
+
+  /* ── OUTPUT PANEL ── */
+  .output-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .gen-btn {
+    background: linear-gradient(135deg, #1e4a8a, #3d8ef0);
+    border: 1px solid var(--accent);
+    color: #fff;
+    border-radius: 8px;
+    padding: 7px 22px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+  .gen-btn:hover { background: linear-gradient(135deg, #2a5fa0, #5aa0ff); box-shadow: 0 0 16px rgba(61,142,240,0.4); }
+  .gen-btn:active { transform: scale(0.97); }
+
+  .hint {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 7px;
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0.7;
+  }
+
+  #statusBar {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    min-height: 14px;
+  }
+</style>
+</head>
+<body>
+
+<h1>⬡ Fractal Explorer</h1>
+<p class="subtitle">Self-similar iterated function system renderer</p>
+
+<!-- ITERATION SLIDER -->
+<div class="iter-panel">
+  <span class="iter-label">ITERATIONS</span>
+  <input type="range" id="iterSlider" min="1" max="12" value="5">
+  <span class="iter-val" id="iterVal">5</span>
+  <span class="iter-label" style="color:var(--text-dim);font-size:11px;">(1–12)</span>
+</div>
+
+<!-- MAIN ROW: Drawing + Transform -->
+<div class="main-row">
+  <!-- PANEL 1: Drawing -->
+  <div class="panel" style="max-width:460px;">
+    <div class="panel-title">01 — Initial Pattern</div>
+    <div class="toolbar" id="drawToolbar">
+      <button class="tool-btn active" data-tool="select" onclick="setDrawTool('select')">✦ Select</button>
+      <button class="tool-btn" data-tool="line" onclick="setDrawTool('line')">╱ Line</button>
+      <button class="tool-btn" data-tool="polyline" onclick="setDrawTool('polyline')">╱╱ Path</button>
+      <button class="tool-btn" data-tool="rect" onclick="setDrawTool('rect')">▭ Rect</button>
+      <button class="tool-btn" data-tool="ellipse" onclick="setDrawTool('ellipse')">◯ Ellipse</button>
+      <button class="tool-btn" data-tool="polygon" onclick="setDrawTool('polygon')">⬡ Poly</button>
+      <div class="sep"></div>
+      <button class="tool-btn success" onclick="copyDrawSelected()">⊕ Copy</button>
+      <button class="tool-btn danger" onclick="deleteDrawSelected()">✕ Delete</button>
+    </div>
+    <canvas id="drawCanvas" width="430" height="430"></canvas>
+    <div id="drawStatus" class="hint">Click to select · Hold Ctrl for uniform shapes</div>
+  </div>
+
+  <!-- PANEL 2: Transform -->
+  <div class="panel" style="max-width:460px;">
+    <div class="panel-title">02 — Similarity Transforms</div>
+    <div class="toolbar">
+      <button class="tool-btn active" data-ttool="tselect" onclick="setTransTool('tselect')">✦ Select</button>
+      <button class="tool-btn" data-ttool="tdraw" onclick="setTransTool('tdraw')">▭ Add Box</button>
+      <div class="sep"></div>
+      <button class="tool-btn success" onclick="copyTransSelected()">⊕ Copy</button>
+      <button class="tool-btn danger" onclick="deleteTransSelected()">✕ Delete</button>
+    </div>
+    <div class="check-row">
+      <input type="checkbox" id="overlayOrigCheck" onchange="renderTransCanvas()">
+      <label for="overlayOrigCheck">Overlay original image</label>
+    </div>
+    <canvas id="transCanvas" width="430" height="430"></canvas>
+    <div class="hint">Drag to add box · Grab corner to resize · Grab edge to rotate · Ctrl = square</div>
+  </div>
+</div>
+
+<!-- OUTPUT PANEL -->
+<div class="output-panel">
+  <div class="output-header">
+    <div class="panel-title" style="margin:0;">03 — Generated Fractal</div>
+    <button class="gen-btn" onclick="generateFractal()">▶ Generate Image</button>
+  </div>
+  <canvas id="outputCanvas" width="900" height="540" style="width:100%;height:auto;max-width:900px;"></canvas>
+  <div id="statusBar">Ready — define a pattern and transforms, then click Generate.</div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// UTILITIES
+// ─────────────────────────────────────────────
+const CANVAS_W = 430, CANVAS_H = 430;
+const STROKE_COLOR = '#58a6ff';
+const SEL_COLOR    = '#3fb950';
+const GRID_COLOR   = 'rgba(48,54,61,0.5)';
+
+function drawGrid(ctx, w, h) {
+  ctx.save();
+  ctx.strokeStyle = GRID_COLOR;
+  ctx.lineWidth = 0.5;
+  const step = 20;
+  for(let x=0;x<=w;x+=step){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke(); }
+  for(let y=0;y<=h;y+=step){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke(); }
+  ctx.restore();
+}
+
+function ptInRect(x,y,rx,ry,rw,rh){
+  return x>=rx&&x<=rx+rw&&y>=ry&&y<=ry+rh;
+}
+function dist(ax,ay,bx,by){ return Math.sqrt((ax-bx)**2+(ay-by)**2); }
+
+// ─────────────────────────────────────────────
+// PANEL 1 — DRAWING
+// ─────────────────────────────────────────────
+const drawCanvas = document.getElementById('drawCanvas');
+const dctx = drawCanvas.getContext('2d');
+let drawTool = 'select';
+let drawShapes = [];   // {type, ...params, selected}
+let drawSelectedIdx = -1;
+let drawPreview = null;
+let drawDragging = false;
+let drawDragStart = null;
+let drawDragShapeOrigin = null;
+let drawPolyPoints = [];
+let drawPolySides = 5;
+
+function setDrawTool(t) {
+  drawTool = t;
+  document.querySelectorAll('#drawToolbar .tool-btn[data-tool]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.tool===t);
+  });
+  if(t!=='polyline') drawPolyPoints=[];
+  drawCanvas.className = (t==='select')?'select-mode':'';
+  renderDrawCanvas();
+}
+
+function getXY(canvas, e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX-r.left, y: e.clientY-r.top };
+}
+
+// Hit testing
+function hitTest(shape, x, y) {
+  if(shape.type==='line'){
+    const d = pointToSegmentDist(x,y,shape.x1,shape.y1,shape.x2,shape.y2);
+    return d < 6;
+  }
+  if(shape.type==='polyline'){
+    for(let i=0;i<shape.pts.length-1;i++){
+      const d = pointToSegmentDist(x,y,shape.pts[i].x,shape.pts[i].y,shape.pts[i+1].x,shape.pts[i+1].y);
+      if(d<6) return true;
+    }
+    return false;
+  }
+  if(shape.type==='rect'){
+    return ptInRect(x,y,shape.x,shape.y,shape.w,shape.h);
+  }
+  if(shape.type==='ellipse'){
+    const cx=shape.x+shape.rx, cy=shape.y+shape.ry;
+    return ((x-cx)/shape.rx)**2+((y-cy)/shape.ry)**2 <= 1;
+  }
+  if(shape.type==='polygon'){
+    return dist(x,y,shape.cx,shape.cy) < shape.r + 5;
+  }
+  return false;
+}
+
+function pointToSegmentDist(px,py,ax,ay,bx,by){
+  const dx=bx-ax,dy=by-ay;
+  const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy||1)));
+  return dist(px,py,ax+t*dx,ay+t*dy);
+}
+
+function selectDraw(idx) {
+  drawSelectedIdx = idx;
+  drawShapes.forEach((s,i)=>s.selected=(i===idx));
+  renderDrawCanvas();
+}
+
+drawCanvas.addEventListener('mousedown', e=>{
+  const {x,y} = getXY(drawCanvas, e);
+  if(drawTool==='select'){
+    let hit=-1;
+    for(let i=drawShapes.length-1;i>=0;i--){
+      if(hitTest(drawShapes[i],x,y)){ hit=i; break; }
+    }
+    selectDraw(hit);
+    if(hit>=0){
+      drawDragging=true;
+      drawDragStart={x,y};
+      drawDragShapeOrigin=JSON.parse(JSON.stringify(drawShapes[hit]));
+    } else {
+      drawDragging=false;
+      drawDragShapeOrigin=null;
+    }
+    return;
+  }
+  if(drawTool==='polyline'){
+    if(drawPolyPoints.length===0) drawPolyPoints.push({x,y});
+    drawPolyPoints.push({x,y});
+    if(e.detail===2){
+      if(drawPolyPoints.length>2){
+        drawShapes.push({type:'polyline', pts:[...drawPolyPoints.slice(0,-1)], selected:false});
+        syncTransPreview();
+      }
+      drawPolyPoints=[];
+    }
+    renderDrawCanvas();
+    return;
+  }
+  drawDragging=true;
+  drawDragStart={x,y};
+  drawPreview={type:drawTool,x1:x,y1:y,x2:x,y2:y,x:x,y:y,w:0,h:0};
+});
+
+drawCanvas.addEventListener('mousemove', e=>{
+  const {x,y} = getXY(drawCanvas,e);
+  if(drawTool==='polyline' && drawPolyPoints.length>0){
+    drawPolyPoints[drawPolyPoints.length-1]={x,y};
+    renderDrawCanvas();
+    return;
+  }
+  if(!drawDragging) return;
+  if(drawTool==='select' && drawSelectedIdx>=0 && drawDragShapeOrigin){
+    const dx=x-drawDragStart.x, dy=y-drawDragStart.y;
+    const orig=drawDragShapeOrigin;
+    const s=drawShapes[drawSelectedIdx];
+    if(orig.type==='line'){ s.x1=orig.x1+dx;s.y1=orig.y1+dy;s.x2=orig.x2+dx;s.y2=orig.y2+dy; }
+    else if(orig.type==='polyline'){ s.pts=orig.pts.map(p=>({x:p.x+dx,y:p.y+dy})); }
+    else if(orig.type==='rect'||orig.type==='ellipse'){ s.x=orig.x+dx;s.y=orig.y+dy; }
+    else if(orig.type==='polygon'){ s.cx=orig.cx+dx;s.cy=orig.cy+dy; }
+    renderDrawCanvas(); return;
+  }
+  if(drawTool==='select') return; // dragging on empty area, nothing to do
+  const ctrl = e.ctrlKey||e.metaKey;
+  const ds=drawDragStart;
+  const dx=x-ds.x, dy=y-ds.y;
+  if(drawTool==='line'){ drawPreview={type:'line',x1:ds.x,y1:ds.y,x2:x,y2:y}; }
+  else if(drawTool==='rect'){
+    let w=dx,h=dy;
+    if(ctrl){ const m=Math.min(Math.abs(w),Math.abs(h)); w=Math.sign(w)*m; h=Math.sign(h)*m; }
+    drawPreview={type:'rect',x:Math.min(ds.x,ds.x+w),y:Math.min(ds.y,ds.y+h),w:Math.abs(w),h:Math.abs(h)};
+  }
+  else if(drawTool==='ellipse'){
+    let rx=Math.abs(dx)/2,ry=Math.abs(dy)/2;
+    if(ctrl){ rx=ry=Math.min(rx,ry); }
+    drawPreview={type:'ellipse',x:ds.x+Math.sign(dx)*rx-rx,y:ds.y+Math.sign(dy)*ry-ry,rx,ry};
+  }
+  else if(drawTool==='polygon'){
+    const r=dist(ds.x,ds.y,x,y);
+    const sides=parseInt(prompt._sides)||5;
+    drawPreview={type:'polygon',cx:ds.x,cy:ds.y,r,sides:5};
+  }
+  renderDrawCanvas();
+});
+
+drawCanvas.addEventListener('mouseup', e=>{
+  if(!drawDragging){ drawDragging=false; return; }
+  drawDragging=false;
+  if(drawTool==='select'){
+    drawDragShapeOrigin=null;
+    renderDrawCanvas();
+    syncTransPreview(); // sync after move completes
+    return;
+  }
+  if(drawTool==='polyline') return;
+  if(!drawPreview) return;
+  const {x,y}=getXY(drawCanvas,e);
+  const ds=drawDragStart;
+  const ctrl=e.ctrlKey||e.metaKey;
+  let shape=null;
+  if(drawTool==='line' && dist(ds.x,ds.y,x,y)>4){
+    shape={type:'line',x1:ds.x,y1:ds.y,x2:x,y2:y,selected:false};
+  } else if(drawTool==='rect'){
+    let dx=x-ds.x,dy=y-ds.y;
+    if(ctrl){const m=Math.min(Math.abs(dx),Math.abs(dy));dx=Math.sign(dx)*m;dy=Math.sign(dy)*m;}
+    const w=Math.abs(dx),h=Math.abs(dy);
+    if(w>3&&h>3) shape={type:'rect',x:Math.min(ds.x,ds.x+dx),y:Math.min(ds.y,ds.y+dy),w,h,selected:false};
+  } else if(drawTool==='ellipse'){
+    let rx=Math.abs(x-ds.x)/2,ry=Math.abs(y-ds.y)/2;
+    if(ctrl){rx=ry=Math.min(rx,ry);}
+    if(rx>2&&ry>2) shape={type:'ellipse',x:ds.x+Math.sign(x-ds.x)*rx-rx,y:ds.y+Math.sign(y-ds.y)*ry-ry,rx,ry,selected:false};
+  } else if(drawTool==='polygon'){
+    const r=dist(ds.x,ds.y,x,y);
+    if(r>5){
+      const sides=prompt_polygon_sides();
+      shape={type:'polygon',cx:ds.x,cy:ds.y,r,sides,selected:false,angle:0};
+    }
+  }
+  if(shape){ drawShapes.push(shape); selectDraw(drawShapes.length-1); }
+  drawPreview=null;
+  renderDrawCanvas();
+  syncTransPreview();
+});
+
+let _polySides=5;
+function prompt_polygon_sides(){
+  const s=parseInt(window.prompt('Number of polygon sides (3–12):','5'));
+  if(isNaN(s)||s<3) return 5;
+  return Math.min(12,s);
+}
+
+function renderDrawCanvas() {
+  dctx.clearRect(0,0,CANVAS_W,CANVAS_H);
+  drawGrid(dctx,CANVAS_W,CANVAS_H);
+  drawShapes.forEach((s,i)=>{ renderShape(dctx,s,s.selected,1); });
+  if(drawPreview){ renderShape(dctx,drawPreview,false,1,true); }
+  if(drawPolyPoints.length>1){
+    dctx.save();
+    dctx.strokeStyle=STROKE_COLOR;dctx.lineWidth=1.5;dctx.setLineDash([4,3]);
+    dctx.beginPath();
+    drawPolyPoints.forEach((p,i)=>i===0?dctx.moveTo(p.x,p.y):dctx.lineTo(p.x,p.y));
+    dctx.stroke();dctx.restore();
+  }
+  // trans canvas is synced separately via syncTransPreview() to avoid circular calls
+}
+
+// Call after shape list changes (add/delete/copy/finish-drag) to update the trans panel
+function syncTransPreview() {
+  if(typeof renderTransCanvas==='function') renderTransCanvas();
+}
+
+function renderShape(ctx, s, sel, lw, preview=false) {
+  ctx.save();
+  ctx.strokeStyle = sel ? SEL_COLOR : STROKE_COLOR;
+  ctx.lineWidth = lw||1.5;
+  ctx.fillStyle='transparent';
+  if(preview) ctx.setLineDash([4,3]);
+  ctx.beginPath();
+  if(s.type==='line'){
+    ctx.moveTo(s.x1,s.y1);ctx.lineTo(s.x2,s.y2);
+  } else if(s.type==='polyline'){
+    if(!s.pts||s.pts.length<2){ctx.restore();return;}
+    s.pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+  } else if(s.type==='rect'){
+    ctx.rect(s.x,s.y,s.w,s.h);
+  } else if(s.type==='ellipse'){
+    ctx.ellipse(s.x+s.rx,s.y+s.ry,s.rx,s.ry,0,0,Math.PI*2);
+  } else if(s.type==='polygon'){
+    const sides=s.sides||5;
+    for(let i=0;i<sides;i++){
+      const a=(s.angle||0)+i/sides*Math.PI*2-Math.PI/2;
+      const px=s.cx+s.r*Math.cos(a),py=s.cy+s.r*Math.sin(a);
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+  }
+  ctx.stroke();
+  if(sel&&!preview){
+    // draw selection handles
+    ctx.setLineDash([]);
+    ctx.strokeStyle=SEL_COLOR;
+    ctx.lineWidth=0.5;
+    const bb=getBBox(s);
+    if(bb){
+      ctx.strokeRect(bb.x-4,bb.y-4,bb.w+8,bb.h+8);
+      [[bb.x-4,bb.y-4],[bb.x+bb.w+4,bb.y-4],[bb.x-4,bb.y+bb.h+4],[bb.x+bb.w+4,bb.y+bb.h+4]].forEach(([hx,hy])=>{
+        ctx.fillStyle=SEL_COLOR;ctx.fillRect(hx-3,hy-3,6,6);
+      });
+    }
+  }
+  ctx.restore();
+}
+
+function getBBox(s){
+  if(s.type==='line') return {x:Math.min(s.x1,s.x2),y:Math.min(s.y1,s.y2),w:Math.abs(s.x2-s.x1),h:Math.abs(s.y2-s.y1)};
+  if(s.type==='polyline'){
+    const xs=s.pts.map(p=>p.x),ys=s.pts.map(p=>p.y);
+    const x=Math.min(...xs),y=Math.min(...ys);
+    return {x,y,w:Math.max(...xs)-x,h:Math.max(...ys)-y};
+  }
+  if(s.type==='rect') return {x:s.x,y:s.y,w:s.w,h:s.h};
+  if(s.type==='ellipse') return {x:s.x,y:s.y,w:s.rx*2,h:s.ry*2};
+  if(s.type==='polygon') return {x:s.cx-s.r,y:s.cy-s.r,w:s.r*2,h:s.r*2};
+  return null;
+}
+
+function copyDrawSelected(){
+  if(drawSelectedIdx<0) return;
+  const orig=drawShapes[drawSelectedIdx];
+  const copy=JSON.parse(JSON.stringify(orig));
+  copy.selected=false;
+  offsetShape(copy, 15, 15);
+  drawShapes.push(copy);
+  selectDraw(drawShapes.length-1);
+  renderDrawCanvas();
+  syncTransPreview();
+}
+
+function offsetShape(s,dx,dy){
+  if(s.type==='line'){s.x1+=dx;s.y1+=dy;s.x2+=dx;s.y2+=dy;}
+  else if(s.type==='polyline'){s.pts=s.pts.map(p=>({x:p.x+dx,y:p.y+dy}));}
+  else if(s.type==='rect'||s.type==='ellipse'){s.x+=dx;s.y+=dy;}
+  else if(s.type==='polygon'){s.cx+=dx;s.cy+=dy;}
+}
+
+function deleteDrawSelected(){
+  if(drawSelectedIdx<0) return;
+  drawShapes.splice(drawSelectedIdx,1);
+  drawSelectedIdx=-1;
+  renderDrawCanvas();
+  syncTransPreview();
+}
+
+renderDrawCanvas();
+
+// ─────────────────────────────────────────────
+// PANEL 2 — TRANSFORMS
+// ─────────────────────────────────────────────
+const transCanvas = document.getElementById('transCanvas');
+const tctx = transCanvas.getContext('2d');
+let transTool = 'tselect';
+let transBoxes = [];
+// Each box: {x,y,w,h, angle, selected}
+let transSelectedIdx = -1;
+let transDragging = false;
+let transDragStart = null;
+let transDragMode = null; // 'move','resize-tl','resize-tr','resize-bl','resize-br','rotate'
+let transDragOrigin = null;
+let transPreviewBox = null;
+
+function setTransTool(t){
+  transTool=t;
+  document.querySelectorAll('[data-ttool]').forEach(b=>b.classList.toggle('active',b.dataset.ttool===t));
+}
+
+function selectTrans(idx){
+  transSelectedIdx=idx;
+  transBoxes.forEach((b,i)=>b.selected=(i===idx));
+  renderTransCanvas();
+}
+
+function getBoxCorners(b){
+  const cx=b.x+b.w/2, cy=b.y+b.h/2;
+  const ang=b.angle||0;
+  const corners=[
+    [-b.w/2,-b.h/2],[b.w/2,-b.h/2],[b.w/2,b.h/2],[-b.w/2,b.h/2]
+  ].map(([lx,ly])=>{
+    const rx=lx*Math.cos(ang)-ly*Math.sin(ang)+cx;
+    const ry=lx*Math.sin(ang)+ly*Math.cos(ang)+cy;
+    return {x:rx,y:ry};
+  });
+  return corners;
+}
+
+function ptInRotatedBox(px,py,b){
+  const cx=b.x+b.w/2, cy=b.y+b.h/2;
+  const ang=-(b.angle||0);
+  const lx=(px-cx)*Math.cos(ang)-(py-cy)*Math.sin(ang);
+  const ly=(px-cx)*Math.sin(ang)+(py-cy)*Math.cos(ang);
+  return Math.abs(lx)<=b.w/2 && Math.abs(ly)<=b.h/2;
+}
+
+function getHandleAt(px,py,b){
+  const cx=b.x+b.w/2, cy=b.y+b.h/2;
+  const ang=-(b.angle||0);
+  const lx=(px-cx)*Math.cos(ang)-(py-cy)*Math.sin(ang);
+  const ly=(px-cx)*Math.sin(ang)+(py-cy)*Math.cos(ang);
+  const hw=b.w/2, hh=b.h/2;
+  // rotate handle
+  const rotHx=cx+(0)*Math.cos(b.angle||0)-(- hh-18)*Math.sin(b.angle||0);
+  const rotHy=cy+(0)*Math.sin(b.angle||0)+(- hh-18)*Math.cos(b.angle||0);
+  if(dist(px,py,rotHx,rotHy)<8) return 'rotate';
+  if(dist(lx,ly,-hw,-hh)<8) return 'resize-tl';
+  if(dist(lx,ly, hw,-hh)<8) return 'resize-tr';
+  if(dist(lx,ly,-hw, hh)<8) return 'resize-bl';
+  if(dist(lx,ly, hw, hh)<8) return 'resize-br';
+  return null;
+}
+
+transCanvas.addEventListener('mousedown',e=>{
+  const {x,y}=getXY(transCanvas,e);
+  if(transTool==='tdraw'){
+    transDragging=true;
+    transDragStart={x,y};
+    transPreviewBox={x,y,w:0,h:0,angle:0};
+    return;
+  }
+  // select mode: first check handles on already-selected box
+  if(transSelectedIdx>=0){
+    const mode=getHandleAt(x,y,transBoxes[transSelectedIdx]);
+    if(mode){
+      transDragging=true; transDragStart={x,y}; transDragMode=mode;
+      transDragOrigin=JSON.parse(JSON.stringify(transBoxes[transSelectedIdx]));
+      return;
+    }
+  }
+  // then check for a hit on any box
+  let hit=-1;
+  for(let i=transBoxes.length-1;i>=0;i--){
+    if(ptInRotatedBox(x,y,transBoxes[i])){ hit=i; break; }
+  }
+  selectTrans(hit);
+  if(hit>=0){
+    transDragging=true; transDragStart={x,y}; transDragMode='move';
+    transDragOrigin=JSON.parse(JSON.stringify(transBoxes[hit]));
+  } else {
+    transDragging=false; transDragMode=null; transDragOrigin=null;
+  }
+});
+
+transCanvas.addEventListener('mousemove',e=>{
+  const {x,y}=getXY(transCanvas,e);
+  const ctrl=e.ctrlKey||e.metaKey;
+  if(!transDragging) return;
+  if(transTool==='tdraw'){
+    let dx=x-transDragStart.x, dy=y-transDragStart.y;
+    if(ctrl){const m=Math.min(Math.abs(dx),Math.abs(dy));dx=Math.sign(dx)*m;dy=Math.sign(dy)*m;}
+    transPreviewBox={
+      x:Math.min(transDragStart.x,transDragStart.x+dx),
+      y:Math.min(transDragStart.y,transDragStart.y+dy),
+      w:Math.abs(dx),h:Math.abs(dy),angle:0
+    };
+    renderTransCanvas();
+    return;
+  }
+  if(transSelectedIdx<0) return;
+  const orig=transDragOrigin;
+  const b=transBoxes[transSelectedIdx];
+  const dx=x-transDragStart.x, dy=y-transDragStart.y;
+  if(transDragMode==='move'){
+    b.x=orig.x+dx; b.y=orig.y+dy;
+  } else if(transDragMode==='rotate'){
+    const cx=orig.x+orig.w/2, cy=orig.y+orig.h/2;
+    b.angle=Math.atan2(y-cy,x-cx)+Math.PI/2;
+  } else if(transDragMode && transDragMode.startsWith('resize')){
+    // local space resize
+    const ang=orig.angle||0;
+    const ldx=dx*Math.cos(-ang)-dy*Math.sin(-ang);
+    const ldy=dx*Math.sin(-ang)+dy*Math.cos(-ang);
+    let nx=orig.x,ny=orig.y,nw=orig.w,nh=orig.h;
+    if(transDragMode==='resize-br'){ nw=Math.max(10,orig.w+ldx); nh=Math.max(10,orig.h+ldy); }
+    else if(transDragMode==='resize-tr'){ nw=Math.max(10,orig.w+ldx); nh=Math.max(10,orig.h-ldy); ny=orig.y+orig.h-nh; }
+    else if(transDragMode==='resize-bl'){ nw=Math.max(10,orig.w-ldx); nh=Math.max(10,orig.h+ldy); nx=orig.x+orig.w-nw; }
+    else if(transDragMode==='resize-tl'){ nw=Math.max(10,orig.w-ldx); nh=Math.max(10,orig.h-ldy); nx=orig.x+orig.w-nw; ny=orig.y+orig.h-nh; }
+    if(ctrl){ const m=Math.min(nw,nh); nw=m; nh=m; }
+    b.x=nx; b.y=ny; b.w=nw; b.h=nh;
+  }
+  renderTransCanvas();
+});
+
+transCanvas.addEventListener('mouseup',e=>{
+  if(!transDragging){transDragging=false;return;}
+  transDragging=false;
+  if(transTool==='tdraw'){
+    const {x,y}=getXY(transCanvas,e);
+    const ctrl=e.ctrlKey||e.metaKey;
+    let dx=x-transDragStart.x,dy=y-transDragStart.y;
+    if(ctrl){const m=Math.min(Math.abs(dx),Math.abs(dy));dx=Math.sign(dx)*m;dy=Math.sign(dy)*m;}
+    const bw=Math.abs(dx),bh=Math.abs(dy);
+    if(bw>8&&bh>8){
+      const nb={x:Math.min(transDragStart.x,transDragStart.x+dx),y:Math.min(transDragStart.y,transDragStart.y+dy),w:bw,h:bh,angle:0,selected:false};
+      transBoxes.push(nb);
+      selectTrans(transBoxes.length-1);
+    }
+    transPreviewBox=null;
+  }
+  transDragMode=null; transDragOrigin=null;
+  renderTransCanvas();
+});
+
+function copyTransSelected(){
+  if(transSelectedIdx<0) return;
+  const orig=transBoxes[transSelectedIdx];
+  const copy=JSON.parse(JSON.stringify(orig));
+  copy.x+=20; copy.y+=20; copy.selected=false;
+  transBoxes.push(copy);
+  selectTrans(transBoxes.length-1);
+}
+
+function deleteTransSelected(){
+  if(transSelectedIdx<0) return;
+  transBoxes.splice(transSelectedIdx,1);
+  transSelectedIdx=-1;
+  renderTransCanvas();
+}
+
+function drawShapesInBox(ctx, shapes, box) {
+  if(!shapes || shapes.length===0) return;
+  const cx = box.x + box.w/2, cy = box.y + box.h/2;
+  const ang = box.angle||0;
+  const sx = box.w / CANVAS_W, sy = box.h / CANVAS_H;
+  const screenScale = Math.sqrt(sx*sx + sy*sy) / Math.SQRT2;
+
+  ctx.save();
+
+  // Build clip path for the rotated box (all in one save block, no restore before clip)
+  ctx.translate(cx, cy);
+  ctx.rotate(ang);
+  ctx.beginPath();
+  ctx.rect(-box.w/2, -box.h/2, box.w, box.h);
+  ctx.clip();
+
+  // Now draw shapes scaled into the box (continuing from current transform: centered on box, rotated)
+  ctx.scale(sx, sy);
+  ctx.translate(-CANVAS_W/2, -CANVAS_H/2);
+
+  shapes.forEach(s => {
+    ctx.save();
+    ctx.strokeStyle = STROKE_COLOR;
+    ctx.lineWidth = 1.2 / screenScale;
+    ctx.fillStyle = 'transparent';
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    if(s.type==='line'){ctx.moveTo(s.x1,s.y1);ctx.lineTo(s.x2,s.y2);}
+    else if(s.type==='polyline'){
+      if(!s.pts||s.pts.length<2){ctx.restore();return;}
+      s.pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+    }
+    else if(s.type==='rect'){ctx.rect(s.x,s.y,s.w,s.h);}
+    else if(s.type==='ellipse'){ctx.ellipse(s.x+s.rx,s.y+s.ry,s.rx,s.ry,0,0,Math.PI*2);}
+    else if(s.type==='polygon'){
+      const sides=s.sides||5;
+      for(let i=0;i<sides;i++){
+        const a=(s.angle||0)+i/sides*Math.PI*2-Math.PI/2;
+        i===0?ctx.moveTo(s.cx+s.r*Math.cos(a),s.cy+s.r*Math.sin(a)):ctx.lineTo(s.cx+s.r*Math.cos(a),s.cy+s.r*Math.sin(a));
+      }
+      ctx.closePath();
+    }
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  ctx.restore(); // restores transform + clip
+}
+
+function renderTransCanvas(){
+  tctx.clearRect(0,0,CANVAS_W,CANVAS_H);
+  drawGrid(tctx,CANVAS_W,CANVAS_H);
+
+  // full-canvas underlay of original drawing (dim ghost)
+  if(document.getElementById('overlayOrigCheck').checked){
+    tctx.save();
+    tctx.globalAlpha=0.15;
+    drawShapesOnCtx(tctx,drawShapes,1,CANVAS_W,CANVAS_H);
+    tctx.restore();
+  }
+
+  // boxes — draw shape preview first, then border/handles on top
+  transBoxes.forEach((b,i)=>{
+    // 1. Shape preview inside box
+    if(drawShapes.length>0){
+      drawShapesInBox(tctx, drawShapes, b);
+    }
+
+    // 2. Box border + tinted fill
+    tctx.save();
+    const cx=b.x+b.w/2, cy=b.y+b.h/2;
+    tctx.translate(cx,cy); tctx.rotate(b.angle||0); tctx.translate(-cx,-cy);
+    tctx.strokeStyle = b.selected ? SEL_COLOR : '#d29922';
+    tctx.lineWidth = b.selected ? 2 : 1.5;
+    tctx.fillStyle = b.selected ? 'rgba(63,185,80,0.04)' : 'rgba(210,153,34,0.0)';
+    tctx.fillRect(b.x,b.y,b.w,b.h);
+    tctx.strokeRect(b.x,b.y,b.w,b.h);
+    // index label
+    tctx.fillStyle = b.selected ? SEL_COLOR : '#d29922';
+    tctx.font = 'bold 10px JetBrains Mono,monospace';
+    tctx.fillText('T'+(i+1), b.x+4, b.y+13);
+    tctx.restore();
+
+    // 3. Selection handles
+    if(b.selected){
+      tctx.save();
+      const cx2=b.x+b.w/2, cy2=b.y+b.h/2;
+      tctx.translate(cx2,cy2); tctx.rotate(b.angle||0); tctx.translate(-cx2,-cy2);
+      [[b.x,b.y],[b.x+b.w,b.y],[b.x,b.y+b.h],[b.x+b.w,b.y+b.h]].forEach(([hx,hy])=>{
+        tctx.fillStyle=SEL_COLOR;
+        tctx.strokeStyle='#0a0e14';
+        tctx.lineWidth=1;
+        tctx.fillRect(hx-4,hy-4,8,8);
+        tctx.strokeRect(hx-4,hy-4,8,8);
+      });
+      // rotate handle stem
+      tctx.strokeStyle=SEL_COLOR; tctx.lineWidth=1; tctx.setLineDash([3,2]);
+      tctx.beginPath(); tctx.moveTo(cx2,b.y); tctx.lineTo(cx2,b.y-18); tctx.stroke();
+      tctx.setLineDash([]);
+      tctx.beginPath(); tctx.arc(cx2,b.y-18,5,0,Math.PI*2);
+      tctx.fillStyle=SEL_COLOR; tctx.fill();
+      tctx.strokeStyle='#0a0e14'; tctx.lineWidth=1; tctx.stroke();
+      tctx.restore();
+    }
+  });
+
+  // drag preview box
+  if(transPreviewBox){
+    tctx.save();
+    tctx.strokeStyle='rgba(88,166,255,0.5)'; tctx.lineWidth=1; tctx.setLineDash([4,3]);
+    tctx.strokeRect(transPreviewBox.x,transPreviewBox.y,transPreviewBox.w,transPreviewBox.h);
+    tctx.restore();
+  }
+}
+
+// Draw shapes to any context with transform
+function drawShapesOnCtx(ctx, shapes, lw, cw, ch) {
+  const sx = cw/CANVAS_W, sy = ch/CANVAS_H;
+  ctx.save();
+  ctx.scale(sx,sy);
+  shapes.forEach(s=>{
+    ctx.save();
+    ctx.strokeStyle=STROKE_COLOR;
+    ctx.lineWidth=lw/sx; // keep line weight consistent
+    ctx.fillStyle='transparent';
+    ctx.beginPath();
+    if(s.type==='line'){ctx.moveTo(s.x1,s.y1);ctx.lineTo(s.x2,s.y2);}
+    else if(s.type==='polyline'){
+      if(!s.pts||s.pts.length<2){ctx.restore();return;}
+      s.pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+    }
+    else if(s.type==='rect'){ctx.rect(s.x,s.y,s.w,s.h);}
+    else if(s.type==='ellipse'){ctx.ellipse(s.x+s.rx,s.y+s.ry,s.rx,s.ry,0,0,Math.PI*2);}
+    else if(s.type==='polygon'){
+      const sides=s.sides||5;
+      for(let i=0;i<sides;i++){
+        const a=(s.angle||0)+i/sides*Math.PI*2-Math.PI/2;
+        i===0?ctx.moveTo(s.cx+s.r*Math.cos(a),s.cy+s.r*Math.sin(a)):ctx.lineTo(s.cx+s.r*Math.cos(a),s.cy+s.r*Math.sin(a));
+      }
+      ctx.closePath();
+    }
+    ctx.stroke();
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+document.getElementById('overlayOrigCheck').addEventListener('change',()=>renderTransCanvas());
+renderTransCanvas();
+
+// ─────────────────────────────────────────────
+// GENERATION
+// ─────────────────────────────────────────────
+const outputCanvas = document.getElementById('outputCanvas');
+const octx = outputCanvas.getContext('2d');
+const OUT_W = 900, OUT_H = 540;
+
+function generateFractal(){
+  if(drawShapes.length===0){ document.getElementById('statusBar').textContent='⚠ No shapes in the drawing panel.'; return; }
+  const effBoxes = getEffectiveBoxes();
+  if(effBoxes.length===0){ document.getElementById('statusBar').textContent='⚠ No transform boxes defined.'; return; }
+  const iters = parseInt(document.getElementById('iterSlider').value);
+  document.getElementById('statusBar').textContent='Generating…';
+  setTimeout(()=>{
+    octx.clearRect(0,0,OUT_W,OUT_H);
+    octx.fillStyle='#0a0e14';
+    octx.fillRect(0,0,OUT_W,OUT_H);
+    drawGrid(octx,OUT_W,OUT_H);
+    const pad=30;
+    // Use a square draw region centered in the output canvas to preserve aspect ratio
+    const sqSize = Math.min(OUT_W, OUT_H) - pad*2;
+    const ox = Math.floor((OUT_W - sqSize) / 2);
+    const oy = pad;
+    const FIXED_LW = 1.2;
+    try{
+      renderFractal(octx, drawShapes, effBoxes, iters, ox, oy, sqSize, sqSize, FIXED_LW);
+      document.getElementById('statusBar').textContent=`✓ Generated ${iters} iteration${iters>1?'s':''} with ${effBoxes.length} transform${effBoxes.length>1?'s':''}.`;
+    } catch(err){
+      document.getElementById('statusBar').textContent='Error: '+err.message;
+      console.error(err);
+    }
+  },10);
+}
+
+function getEffectiveBoxes(){
+  const boxes=[...transBoxes];
+  if(document.getElementById('overlayOrigCheck').checked){
+    // add identity (full canvas)
+    boxes.push({x:0,y:0,w:CANVAS_W,h:CANVAS_H,angle:0,isIdentity:true});
+  }
+  return boxes;
+}
+
+// Compute affine transform from source rect (0,0,CANVAS_W,CANVAS_H) -> box in transform space -> output space
+function getTransformMatrix(box, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH){
+  // box is in transCanvas space (430x430)
+  // map transCanvas space -> output space
+  const tx = dstX + (box.x / CANVAS_W) * dstW;
+  const ty = dstY + (box.y / CANVAS_H) * dstH;
+  const tw = (box.w / CANVAS_W) * dstW;
+  const th = (box.h / CANVAS_H) * dstH;
+  const ang = box.angle || 0;
+  // scale
+  const sx = tw / dstW;
+  const sy = th / dstH;
+  return { tx, ty, tw, th, sx, sy, ang, cx: tx+tw/2, cy: ty+th/2 };
+}
+
+function renderFractal(ctx, shapes, boxes, iters, ox, oy, ow, oh, fixedLW){
+  // Recursive: at depth 0 draw shapes. At higher depths, for each box, recursively draw.
+  // We draw bottom-up: use an offscreen canvas approach per iteration
+  // Strategy: collect all transforms as matrices and apply at leaf nodes
+  if(iters===0 || shapes.length===0) return;
+
+  // Build list of all leaf transforms (product of iters transform applications)
+  // Each transform maps unit square to a box in output space
+  // We use matrix accumulation
+  
+  // Initial transforms: one per box, mapping output space to sub-box
+  // Represent transform as: [a, b, c, d, e, f] for [x' = a*x+c*y+e, y' = b*x+d*y+f]
+  // We accumulate from root to leaf
+
+  const allLeaves = [];
+  
+  // identity transform for the output region
+  const identity = [ow/CANVAS_W, 0, 0, oh/CANVAS_H, ox, oy];
+
+  function compose(m2, m1){
+    // apply m1 then m2
+    // m(x,y) = [a*x+c*y+e, b*x+d*y+f]
+    // (m2 ∘ m1)(x,y) = m2(m1(x,y))
+    const a1=m1[0],b1=m1[1],c1=m1[2],d1=m1[3],e1=m1[4],f1=m1[5];
+    const a2=m2[0],b2=m2[1],c2=m2[2],d2=m2[3],e2=m2[4],f2=m2[5];
+    return [
+      a2*a1+c2*b1, b2*a1+d2*b1,
+      a2*c1+c2*d1, b2*c1+d2*d1,
+      a2*e1+c2*f1+e2, b2*e1+d2*f1+f2
+    ];
+  }
+
+  // box transform: maps (0,0)-(CW,CH) to box region (with rotation)
+  function boxMatrix(box){
+    const bx=box.x, by=box.y, bw=box.w, bh=box.h, ang=box.angle||0;
+    const sx=bw/CANVAS_W, sy=bh/CANVAS_H;
+    const cx=bx+bw/2, cy=by+bh/2;
+    // scale then rotate around center of box
+    // T = translate(cx,cy) * rotate(ang) * scale(sx,sy) * translate(-CW/2,-CH/2)
+    const cosA=Math.cos(ang), sinA=Math.sin(ang);
+    const a=sx*cosA, b_=sx*sinA, c=-sy*sinA, d=sy*cosA;
+    const e=cx-CANVAS_W/2*a+CANVAS_H/2*sy*sinA;
+    const f=cy-CANVAS_W/2*b_-CANVAS_H/2*sy*cosA+CANVAS_H/2*sy*cosA;
+    // Simplified: scale then rotate
+    // point (px,py) -> scale -> (px*sx, py*sy) -> center shift then rotate
+    // Let me use explicit: p -> p_scaled = (px*sx - CW/2*sx, py*sy - CH/2*sy)
+    //                        then rotate: (p_scaled * R) + center
+    const e2 = cx + (-CANVAS_W/2*sx)*cosA - (-CANVAS_H/2*sy)*sinA;
+    const f2 = cy + (-CANVAS_W/2*sx)*sinA + (-CANVAS_H/2*sy)*cosA;
+    return [sx*cosA, sx*sinA, -sy*sinA, sy*cosA, e2, f2];
+  }
+
+  // map from draw canvas (CANVAS_W x CANVAS_H square) to output space (also square: ow===oh)
+  const uniformScale = ow / CANVAS_W; // ow===oh===sqSize, CANVAS_W===CANVAS_H, so this is uniform
+  const rootMat = [uniformScale, 0, 0, uniformScale, ox, oy];
+
+  function recurse(depth, mat){
+    if(depth===0){
+      allLeaves.push(mat);
+      return;
+    }
+    for(const box of boxes){
+      const bm = boxMatrix(box);
+      const combined = compose(mat, bm);
+      recurse(depth-1, combined);
+    }
+  }
+
+  recurse(iters, rootMat);
+
+  // Draw all shapes at each leaf transform
+  ctx.save();
+  ctx.strokeStyle=STROKE_COLOR;
+  ctx.lineWidth=fixedLW;
+  
+  for(const mat of allLeaves){
+    ctx.save();
+    ctx.transform(mat[0],mat[1],mat[2],mat[3],mat[4],mat[5]);
+    // draw shapes in draw-canvas space
+    shapes.forEach(s=>{
+      ctx.save();
+      ctx.strokeStyle=STROKE_COLOR;
+      ctx.lineWidth=fixedLW;
+      ctx.fillStyle='transparent';
+      // reset transform for line width to be constant in screen space
+      // We accomplish constant line weight by dividing by the current scale
+      const scale=Math.sqrt(mat[0]*mat[0]+mat[1]*mat[1]);
+      ctx.lineWidth=fixedLW/scale;
+      ctx.beginPath();
+      if(s.type==='line'){ctx.moveTo(s.x1,s.y1);ctx.lineTo(s.x2,s.y2);}
+      else if(s.type==='polyline'){
+        if(!s.pts||s.pts.length<2){ctx.restore();return;}
+        s.pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+      }
+      else if(s.type==='rect'){ctx.rect(s.x,s.y,s.w,s.h);}
+      else if(s.type==='ellipse'){ctx.ellipse(s.x+s.rx,s.y+s.ry,s.rx,s.ry,0,0,Math.PI*2);}
+      else if(s.type==='polygon'){
+        const sides=s.sides||5;
+        for(let i=0;i<sides;i++){
+          const a=(s.angle||0)+i/sides*Math.PI*2-Math.PI/2;
+          i===0?ctx.moveTo(s.cx+s.r*Math.cos(a),s.cy+s.r*Math.sin(a)):ctx.lineTo(s.cx+s.r*Math.cos(a),s.cy+s.r*Math.sin(a));
+        }
+        ctx.closePath();
+      }
+      ctx.stroke();
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────
+// ITERATION SLIDER
+// ─────────────────────────────────────────────
+const slider = document.getElementById('iterSlider');
+const iterVal = document.getElementById('iterVal');
+slider.addEventListener('input',()=>{ iterVal.textContent=slider.value; });
+
+// Initial state: add a demo triangle to draw canvas
+(function initDemo(){
+  drawShapes.push({type:'polygon',cx:215,cy:215,r:120,sides:3,angle:0,selected:false});
+  drawShapes.push({type:'ellipse',x:165,y:165,rx:50,ry:50,selected:false});
+  renderDrawCanvas();
+  // add two transform boxes
+  transBoxes.push({x:40,y:40,w:150,h:150,angle:0,selected:false});
+  transBoxes.push({x:240,y:240,w:130,h:130,angle:0.3,selected:false});
+  renderTransCanvas();
+})();
+</script>
+</body>
+</html>
